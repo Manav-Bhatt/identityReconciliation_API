@@ -6,8 +6,8 @@ A production-ready Node.js microservice designed to handle identity reconciliati
 
 ## 🚀 Live Deployment
 
-- **Base URL:** `https://YOUR_RAILWAY_DOMAIN.up.railway.app`
-- **Endpoint:** `POST /identify`
+- **Base URL:** `https://identityreconciliationapi-production.up.railway.app`
+- **Endpoint:** `POST /identify`->`identityreconciliationapi-production.up.railway.app/identify`
 - **Health Check:** `GET /`
 
 ---
@@ -66,8 +66,8 @@ This ensures a **flattened and efficient query structure**.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/YOUR-REPO-NAME.git
-cd YOUR-REPO-NAME
+git clone https://github.com/Manav-Bhatt/identityReconciliation_API.git
+cd identityReconciliation_API
 ```
 
 ### 2. Install dependencies
