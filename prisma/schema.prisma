@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,10 +14,10 @@ model Contact {
   phoneNumber    String?
   email          String?
   linkedId       Int?
-  linkPrecedence String    @default("primary") //  "primary" or "secondary"
+  linkPrecedence String    @default("primary") // Will be "primary" or "secondary"
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime? 
+  deletedAt      DateTime? // We use this for soft deletes if needed
 
   // These relations help us easily fetch a primary's secondaries in our code later
   linkedContact  Contact?  @relation("ContactLinks", fields: [linkedId], references: [id])

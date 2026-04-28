@@ -4,10 +4,10 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const app = express();
 app.use(express.json());
-
+// Health check route 
 app.get('/', (req: Request, res: Response) => {
-  res.status(200).send('Bitespeed Identity Reconciliation API is running perfectly!');
-});
+    res.status(200).send('Identity Reconciliation API is running perfectly!');
+  });
 
 app.post('/identify', async (req: Request, res: Response): Promise<any> => {
   try {
@@ -18,16 +18,20 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
       return res.status(400).json({ error: 'Either email or phoneNumber is required' });
     }
 
+    // Convert phoneNumber to string to standardize database searches
     const phoneStr = phoneNumber ? String(phoneNumber) : null;
 
+    // Construct search conditions dynamically
     const orConditions = [];
     if (email) orConditions.push({ email });
     if (phoneStr) orConditions.push({ phoneNumber: phoneStr });
+
+    // 1. Find ANY contacts that match the incoming email or phone
     const matchedContacts = await prisma.contact.findMany({
       where: { OR: orConditions }
     });
 
-    //SCENARIO 1: Brand New Customer (No matches found)
+    // 2. SCENARIO 1: Brand New Customer (No matches found)
     if (matchedContacts.length === 0) {
       const newContact = await prisma.contact.create({
         data: {
@@ -47,8 +51,11 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
       });
     }
 
-    const matchedIds = matchedContacts.map((c) => c.id);
-    const linkedIds = matchedContacts.map((c) => c.linkedId).filter((id): id is number => id !== null);
+    // 3. Gather all related contacts (the entire "tree" of the matches)
+    const matchedIds = matchedContacts.map(c => c.id);
+    
+    // TYPE FIX 1: Explicitly tell TypeScript we are removing nulls and returning strict numbers
+    const linkedIds = matchedContacts.map(c => c.linkedId).filter((id): id is number => id !== null);
     const allRelevantIds = Array.from(new Set([...matchedIds, ...linkedIds]));
 
     let allContacts = await prisma.contact.findMany({
@@ -62,17 +69,17 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
 
     // 4. Find the oldest Primary Contact among the network
     const primaryContacts = allContacts
-      .filter((c) => c.linkPrecedence === 'primary' || c.linkedId === null)
+      .filter(c => c.linkPrecedence === 'primary' || c.linkedId === null)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     // Failsafe in case all matched contacts were secondaries
     const ultimatePrimary = primaryContacts.length > 0 ? primaryContacts[0] : allContacts[0];
     const secondaryPrimaries = primaryContacts.slice(1);
 
-    // SCENARIO 4: Account Merge (We found multiple primary contacts)
+    // 5. SCENARIO 4: Account Merge (We found multiple primary contacts)
     if (secondaryPrimaries.length > 0) {
       for (const sp of secondaryPrimaries) {
-        
+        // Demote newer primaries to secondaries
         await prisma.contact.update({
           where: { id: sp.id },
           data: {
@@ -81,7 +88,7 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
           }
         });
 
-        
+        // Redirect all of their existing secondaries to the ultimate primary
         await prisma.contact.updateMany({
           where: { linkedId: sp.id },
           data: {
@@ -90,7 +97,7 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
         });
       }
 
-  
+      // Refresh our local network list after updating the database
       allContacts = await prisma.contact.findMany({
         where: {
           OR: [
@@ -101,9 +108,10 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
       });
     }
 
-    // SCENARIO 2/3: Do we need to add a new secondary?
-    const existingEmails = new Set(allContacts.map((c) => c.email).filter((e): e is string => e !== null));
-    const existingPhones = new Set(allContacts.map((c) => c.phoneNumber).filter((p): p is string => p !== null));
+    // 6. SCENARIO 2/3: Do we need to add a new secondary?
+    // TYPE FIX 2: Ensure the Sets are strictly typed as strings
+    const existingEmails = new Set(allContacts.map(c => c.email).filter((e): e is string => e !== null));
+    const existingPhones = new Set(allContacts.map(c => c.phoneNumber).filter((p): p is string => p !== null));
 
     const isNewEmail = email && !existingEmails.has(email);
     const isNewPhone = phoneStr && !existingPhones.has(phoneStr);
@@ -120,10 +128,12 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
       allContacts.push(newSecondary);
     }
 
-    //Format the response
+    // 7. Format the response
     const emails = new Set<string>();
     const phoneNumbers = new Set<string>();
-    const secondaryContactIds = new Set<number>();
+    
+    // TYPE FIX 3: Initialize as a Set, not an array, so we can use .add()
+    const secondaryContactIds = new Set<number>(); 
 
     if (ultimatePrimary.email) emails.add(ultimatePrimary.email);
     if (ultimatePrimary.phoneNumber) phoneNumbers.add(ultimatePrimary.phoneNumber);
@@ -138,10 +148,10 @@ app.post('/identify', async (req: Request, res: Response): Promise<any> => {
 
     return res.status(200).json({
       contact: {
-        primaryContatctId: ultimatePrimary.id,
+        primaryContatctId: ultimatePrimary.id, 
         emails: Array.from(emails),
         phoneNumbers: Array.from(phoneNumbers),
-        secondaryContactIds: Array.from(secondaryContactIds)
+        secondaryContactIds: Array.from(secondaryContactIds) 
       }
     });
 
