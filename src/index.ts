@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 // Health check route 
 app.get('/', (req: Request, res: Response) => {
-    res.status(200).send('Identity Reconciliation API is running perfectly!');
+    res.status(200).send('Identity Reconciliation API is running perfectly!, hit /identify endpoint with payload');
   });
 
 app.post('/identify', async (req: Request, res: Response): Promise<any> => {
